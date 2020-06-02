@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
 
 import com.fenger.coolweather.model.City;
 import com.fenger.coolweather.model.Country;
@@ -86,7 +87,7 @@ public class CoolWearherDB {
             values.put("country_name",country.getCountryName());
             values.put("country_code",country.getCountryCode());
             values.put("city_id",country.getCityId());
-            db.insert("City",null,values);
+            db.insert("Country",null,values);
         }
     }
 
@@ -152,6 +153,7 @@ public class CoolWearherDB {
         if (cursor != null){
             cursor.close();
         }
+        Log.d("fengers", "loadCountry: "+ list.size());
         return list;
     }
 }

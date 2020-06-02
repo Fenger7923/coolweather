@@ -2,14 +2,18 @@ package com.fenger.coolweather.activity;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
@@ -18,6 +22,9 @@ import com.fenger.coolweather.db.CoolWearherDB;
 import com.fenger.coolweather.model.City;
 import com.fenger.coolweather.model.Country;
 import com.fenger.coolweather.model.Province;
+import com.fenger.coolweather.util.HttpCallBackListener;
+import com.fenger.coolweather.util.HttpUtil;
+import com.fenger.coolweather.util.Utility;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,9 +62,15 @@ public class ChooseActivity extends Activity {
         setContentView(R.layout.choose_area);
         listView = findViewById(R.id.list_view);
         titleText = findViewById(R.id.title_text);
-        adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,dataList);
+        adapter = new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,dataList);
         listView.setAdapter(adapter);
         coolWearherDB = CoolWearherDB.getInstance(this);
+
+        if(!isOpenNetwork()){
+            Log.d("fengers", "onCreate: NO NETWORK");
+        }else {
+            Log.d("fengers", "onCreate: HAS NETWORK");
+        }
 
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -74,6 +87,19 @@ public class ChooseActivity extends Activity {
         queryProvinces();
     }
 
+    /**
+     * 对网络连接状态进行判断
+     * @return  true, 可用； false， 不可用
+     */
+    private boolean isOpenNetwork() {
+        ConnectivityManager connManager = (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+        if(connManager.getActiveNetworkInfo() != null) {
+            return connManager.getActiveNetworkInfo().isAvailable();
+        }
+
+        return false;
+    }
+
     private void queryProvinces(){
         provinceList = coolWearherDB.loadProvince();
         if(provinceList.size() > 0){
@@ -86,7 +112,7 @@ public class ChooseActivity extends Activity {
             titleText.setText("China");
             currentLevel = LEVEL_PROVINCE;
         }else {
-            queryFormServer(null,"province");
+            queryFromServer(null,"province");
         }
     }
 
@@ -102,7 +128,7 @@ public class ChooseActivity extends Activity {
             titleText.setText(selectedProvince.getProvinceName());
             currentLevel = LEVEL_CITY;
         }else {
-            queryFormServer(selectedProvince.getProvinceCode(),"city");
+            queryFromServer(selectedProvince.getProvinceCode(),"city");
         }
     }
 
@@ -118,7 +144,7 @@ public class ChooseActivity extends Activity {
             titleText.setText(selectedCity.getCityName());
             currentLevel = LEVEL_COUNTRY;
         }else {
-            queryFormServer(selectedCity.getCityCode(),"city");
+            queryFromServer(selectedCity.getCityCode(),"contries");
         }
     }
 
@@ -129,6 +155,80 @@ public class ChooseActivity extends Activity {
         }else {
             address = "http://www.weather.com.cn/data/list3/city.xml";
         }
+
         showProgressDialog();
+
+        HttpUtil.sendHttpRequest(address, new HttpCallBackListener() {
+            @Override
+            public void onFinish(String response) {
+                boolean result = false;
+                if ("province".equals(type)){
+                    result = Utility.handleProvincesResponse(coolWearherDB,response);
+                }else if("city".equals(type)) {
+                    result = Utility.handleCitiesResponse(coolWearherDB,response,selectedProvince.getId());
+                }else if("contries".equals(type)){
+                    result = Utility.handleCountriesResponse(coolWearherDB,response,selectedCity.getId());
+                }
+                if(result){
+                    //回到主线程处理逻辑
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            closeProgressDialog();
+                            if ("province".equals(type)){
+                                queryProvinces();
+                            }else if ("city".equals(type)){
+                                queryCities();
+                            }else if ("contries".equals(type)){
+                                queryCountries();
+                            }
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        closeProgressDialog();
+                        Toast.makeText(ChooseActivity.this,"加载失败",Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * 显示对话框
+     */
+    private void showProgressDialog(){
+        if (progressDialog == null){
+            progressDialog = new ProgressDialog(this);
+            progressDialog.setMessage("正在加载。。。。");
+            progressDialog.setCanceledOnTouchOutside(false);
+        }
+        progressDialog.show();
+    }
+
+    /**
+     * 隐藏对话框
+     */
+    private void closeProgressDialog(){
+        if (progressDialog != null){
+            progressDialog.dismiss();
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if(currentLevel == LEVEL_COUNTRY){
+            queryCities();
+        }else if (currentLevel == LEVEL_CITY){
+            queryProvinces();
+        }else if(currentLevel == LEVEL_PROVINCE){
+            finish();
+        }
     }
 }
