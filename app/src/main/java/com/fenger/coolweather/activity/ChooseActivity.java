@@ -3,8 +3,11 @@ package com.fenger.coolweather.activity;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -58,6 +61,14 @@ public class ChooseActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        if (preferences.getBoolean("city_seleted",false)){
+            Intent intent = new Intent(this,WeatherActivity.class);
+            startActivity(intent);
+            finish();
+            return;
+        }
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.choose_area);
         listView = findViewById(R.id.list_view);
@@ -81,6 +92,12 @@ public class ChooseActivity extends Activity {
                 }else if(currentLevel == LEVEL_CITY){
                     selectedCity = cityList.get(position);
                     queryCountries();
+                }else if(currentLevel == LEVEL_COUNTRY){
+                    String countryCode = countryList.get(position).getCountryCode();
+                    Intent intent = new Intent(ChooseActivity.this,WeatherActivity.class);
+                    intent.putExtra("country_code",countryCode);
+                    startActivity(intent);
+                    finish();
                 }
             }
         });
