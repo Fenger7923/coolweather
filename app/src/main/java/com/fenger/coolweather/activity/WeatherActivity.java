@@ -1,6 +1,7 @@
 package com.fenger.coolweather.activity;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -8,12 +9,14 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
 import com.fenger.coolweather.R;
+import com.fenger.coolweather.service.AutoUpdateService;
 import com.fenger.coolweather.util.HttpCallBackListener;
 import com.fenger.coolweather.util.HttpUtil;
 import com.fenger.coolweather.util.Utility;
@@ -33,6 +36,8 @@ public class WeatherActivity extends Activity {
     private TextView temp1Text;//发布时间
     private TextView temp2Text;//最高气温
     private TextView currentDateText;//当前时间
+    private Button switchCity;//切换城市
+    private Button refreshWeather;//更新天气
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -47,6 +52,8 @@ public class WeatherActivity extends Activity {
         temp1Text = findViewById(R.id.temp1);
         temp2Text = findViewById(R.id.temp2);
         currentDateText = findViewById(R.id.current_date);
+        switchCity = findViewById(R.id.switch_city);
+        refreshWeather = findViewById(R.id.refresh_weather);
 
         String countryCode = getIntent().getStringExtra("country_code");
         if (!TextUtils.isEmpty(countryCode)){
@@ -57,6 +64,28 @@ public class WeatherActivity extends Activity {
         }else{
             showWeather();
         }
+
+        switchCity.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(WeatherActivity.this,ChooseActivity.class);
+                intent.putExtra("from_weather_activity",true);
+                startActivity(intent);
+                finish();
+            }
+        });
+
+        refreshWeather.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                publishText.setText("更新中。。。");
+                SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this);
+                String weatherCode = preferences.getString("weather_code","");
+                if(!TextUtils.isEmpty(weatherCode)){
+                    queryWeatherInfo(weatherCode);
+                }
+            }
+        });
     }
 
     private void showWeather() {
@@ -69,6 +98,9 @@ public class WeatherActivity extends Activity {
         currentDateText.setText(preferences.getString("current_date",""));
         weatherInfoLayout.setVisibility(View.VISIBLE);
         cityNameText.setVisibility(View.VISIBLE);
+
+        Intent intent = new Intent(this, AutoUpdateService.class);
+        startService(intent);
     }
 
     private void queryWeatherCode(String countryCode) {
@@ -86,7 +118,6 @@ public class WeatherActivity extends Activity {
         HttpUtil.sendHttpRequest(address, new HttpCallBackListener() {
             @Override
             public void onFinish(String response) {
-                Log.d("fenger", "onFinish: "+"   "+type);
                 if ("countryCode".equals(type)){
                     if(!TextUtils.isEmpty(response)){
                         if ("countryCode".equals(type)){
